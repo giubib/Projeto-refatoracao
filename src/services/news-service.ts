@@ -1,70 +1,77 @@
 import prisma from "../database";
 import * as newsRepository from "../repositories/news-repository";
-import { AlterNewsData, CreateNewsData } from "../repositories/news-repository";
+import { CreateNewsData, UpdateNewsData } from "../repositories/news-repository";
+import { DEFAULT_ORDER } from "../config/constants";
 
-export async function getNews() {
-  return newsRepository.getNoticias();
+const MIN_TEXT_LENGTH = 500;
+
+export interface ListNewsQuery {
+  page?: string | number;
+  order?: string;
+  title?: string;
 }
 
-export async function getSpecificNews(id: number) {
-  const news = await newsRepository.getNoticiaById(id);
-  if (!news) {
-    throw {
-      name: "NotFound",
-      message: `News with id ${id} not found.`
-    }
-  }
+export async function listNews(query: ListNewsQuery = {}) {
+  const page = Number(query.page) > 0 ? Number(query.page) : 1;
+  const order = query.order === "asc" ? "asc" : DEFAULT_ORDER;
+  return newsRepository.findMany({ page, order, title: query.title });
+}
 
+export async function getNewsById(id: number) {
+  const news = await newsRepository.findById(id);
+  if (!news) throwNotFound(id);
   return news;
 }
 
-export async function createNews(newsData: CreateNewsData) {
-  await validate(newsData);
-  return newsRepository.createNoticia(newsData);
+export async function createNews(data: CreateNewsData) {
+  await validateNewsData(data);
+  return newsRepository.create(data);
 }
 
-export async function alterNews(id: number, newsData: AlterNewsData) {
-  const news = await getSpecificNews(id);
-  await validate(newsData, news.title !== newsData.title);
-
-  return newsRepository.updateNoticia(id, newsData);
+export async function alterNews(id: number, data: UpdateNewsData) {
+  const current = await getNewsById(id);
+  const titleChanged = data.title && data.title !== current.title;
+  await validateNewsData({ ...current, ...data } as CreateNewsData, titleChanged);
+  return newsRepository.update(id, data);
 }
 
 export async function deleteNews(id: number) {
-  await getSpecificNews(id);
-  return newsRepository.removeNoticia(id);
+  await getNewsById(id);
+  return newsRepository.remove(id);
 }
 
-async function validate(newsData: CreateNewsData, isNew = true) {
-  // validate if news with specific text already exists
-  if (isNew) {
-    const newsWithTitle = await prisma.news.findFirst({
-      where: { title: newsData.title }
-    });
+async function validateNewsData(data: CreateNewsData, checkTitle = true) {
+  if (checkTitle) await ensureUniqueTitle(data.title);
+  ensureMinTextLength(data.text);
+  ensureFuturePublicationDate(data.publicationDate);
+}
 
-    if (newsWithTitle) {
-      throw {
-        name: "Conflict",
-        message: `News with title ${newsData.title} already exist`
-      }
-    }
-  }
+async function ensureUniqueTitle(title: string) {
+  const exists = await prisma.news.findFirst({ where: { title } });
+  if (exists) throwConflict(`News with title "${title}" already exists.`);
+}
 
-  // checks news text length
-  if (newsData.text.length < 500) {
-    throw {
-      name: "BadRequest",
-      message: "The news text must be at least 500 characters long.",
-    };
+function ensureMinTextLength(text: string) {
+  if (text.length < MIN_TEXT_LENGTH) {
+    throwBadRequest(`The news text must be at least ${MIN_TEXT_LENGTH} characters long.`);
   }
+}
 
-  // checks date
-  const currentDate = new Date();
-  const publicationDate = new Date(newsData.publicationDate);
-  if (publicationDate.getTime() < currentDate.getTime()) {
-    throw {
-      name: "BadRequest",
-      message: "The publication date cannot be in the past.",
-    };
+function ensureFuturePublicationDate(date: string | Date) {
+  const publicationDate = new Date(date);
+  if (publicationDate < new Date()) {
+    throwBadRequest("The publication date cannot be in the past.");
   }
+}
+
+function throwNotFound(id: number) {
+  throw { name: "NotFound", message: `News with id ${id} not found.` };
+}
+
+function throwConflict(message: string) {
+  throw { name: "Conflict", message };
+}
+
+function throwBadRequest(message: string) {
+  throw { name: "BadRequest", message };
 }

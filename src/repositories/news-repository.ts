@@ -1,38 +1,40 @@
-import prisma from "./../database";
+import prisma from "../database";
 import { News } from "@prisma/client";
+import { DEFAULT_PAGE_SIZE, DEFAULT_ORDER } from "../config/constants";
 
 export type CreateNewsData = Omit<News, "id" | "createAt">;
-export type AlterNewsData = CreateNewsData;
+export type UpdateNewsData = Partial<CreateNewsData>;
 
-export function getNoticias() {
+export interface FindManyParams {
+  page?: number;
+  order?: "asc" | "desc";
+  title?: string;
+}
+
+export async function findMany({ page = 1, order = DEFAULT_ORDER, title }: FindManyParams = {}) {
+  const take = DEFAULT_PAGE_SIZE;
+  const skip = (page - 1) * take;
+
   return prisma.news.findMany({
-    orderBy: {
-      publicationDate: "desc"
-    }
+    where: title ? { title: { contains: title, mode: "insensitive" } } : undefined,
+    orderBy: { publicationDate: order },
+    take,
+    skip,
   });
 }
 
-export function getNoticiaById(id: number) {
-  return prisma.news.findUnique({
-    where: { id }
-  })
+export function findById(id: number) {
+  return prisma.news.findUnique({ where: { id } });
 }
 
-export async function createNoticia(newsData: CreateNewsData) {
-  return prisma.news.create({
-    data: { ...newsData, publicationDate: new Date(newsData.publicationDate) }
-  });
+export function create(data: CreateNewsData) {
+  return prisma.news.create({ data });
 }
 
-export async function updateNoticia(id: number, news: AlterNewsData) {
-  return prisma.news.update({
-    where: { id },
-    data: { ...news, publicationDate: new Date(news.publicationDate) }
-  })
+export function update(id: number, data: UpdateNewsData) {
+  return prisma.news.update({ where: { id }, data });
 }
 
-export async function removeNoticia(id: number) {
-  return prisma.news.delete({
-    where: { id }
-  })
+export function remove(id: number) {
+  return prisma.news.delete({ where: { id } });
 }

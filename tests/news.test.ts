@@ -1,8 +1,7 @@
-
 import supertest from "supertest";
 import app from "../src/app";
 import prisma from "../src/database";
-import { faker } from '@faker-js/faker';
+import { faker } from "@faker-js/faker";
 import httpStatus from "http-status";
 
 import { generateRandomNews, persistNewRandomNews } from "./factories/news-factory";
@@ -22,16 +21,18 @@ describe("GET /news", () => {
     const result = await api.get("/news");
     const news = result.body;
     expect(news).toHaveLength(3);
-    expect(news).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: expect.any(Number),
-        author: expect.any(String),
-        firstHand: expect.any(Boolean),
-        publicationDate: expect.any(String),
-        title: expect.any(String),
-        text: expect.any(String)
-      })
-    ]))
+    expect(news).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.any(Number),
+          author: expect.any(String),
+          firstHand: expect.any(Boolean),
+          publicationDate: expect.any(String),
+          title: expect.any(String),
+          text: expect.any(String),
+        }),
+      ])
+    );
   });
 
   it("should get a specific id by id", async () => {
@@ -39,7 +40,7 @@ describe("GET /news", () => {
     const { status, body } = await api.get(`/news/${news.id}`);
     expect(status).toBe(httpStatus.OK);
     expect(body).toMatchObject({
-      id: news.id
+      id: news.id,
     });
   });
 
@@ -52,7 +53,6 @@ describe("GET /news", () => {
     const { status } = await api.get(`/news/0`);
     expect(status).toBe(httpStatus.BAD_REQUEST);
   });
-
 });
 
 describe("POST /news", () => {
@@ -63,13 +63,13 @@ describe("POST /news", () => {
     expect(status).toBe(httpStatus.CREATED);
     expect(body).toMatchObject({
       id: expect.any(Number),
-      text: newsBody.text
+      text: newsBody.text,
     });
 
     const news = await prisma.news.findUnique({
       where: {
-        id: body.id
-      }
+        id: body.id,
+      },
     });
 
     expect(news).not.toBeNull();
@@ -102,7 +102,6 @@ describe("POST /news", () => {
     const { status } = await api.post("/news").send(newsBody);
     expect(status).toBe(httpStatus.BAD_REQUEST);
   });
-
 });
 
 describe("DELETE /news", () => {
@@ -114,8 +113,8 @@ describe("DELETE /news", () => {
 
     const news = await prisma.news.findUnique({
       where: {
-        id: newsId
-      }
+        id: newsId,
+      },
     });
 
     expect(news).toBeNull();
@@ -130,7 +129,6 @@ describe("DELETE /news", () => {
     const { status } = await api.delete(`/news/0`);
     expect(status).toBe(httpStatus.BAD_REQUEST);
   });
-
 });
 
 describe("PUT /news", () => {
@@ -143,13 +141,13 @@ describe("PUT /news", () => {
 
     const news = await prisma.news.findUnique({
       where: {
-        id: newsId
-      }
+        id: newsId,
+      },
     });
 
     expect(news).toMatchObject({
       text: newsData.text,
-      title: newsData.title
+      title: newsData.title,
     });
   });
 
@@ -191,6 +189,23 @@ describe("PUT /news", () => {
     const { status } = await api.put(`/news/${news.id}`).send(newsBody);
     expect(status).toBe(httpStatus.BAD_REQUEST);
   });
+});
+describe("GET /news – listagem", () => {
+  it("retorna 10 itens por padrão", async () => {
+    const res = await supertest(app).get("/news");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeLessThanOrEqual(10);
+  });
 
+  it("traz página 2 ordenada asc", async () => {
+    const res = await supertest(app).get("/news?page=2&order=asc");
+    expect(res.status).toBe(200);
+    expect(res.body[0].publicationDate <= res.body[1].publicationDate).toBe(true);
+  });
 
+  it("filtra por título (case‑insensitive)", async () => {
+    const res = await supertest(app).get("/news?title=driven");
+    expect(res.status).toBe(200);
+    res.body.forEach((item: any) => expect(item.title.toLowerCase()).toContain("driven"));
+  });
 });
