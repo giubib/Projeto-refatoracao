@@ -1,4 +1,3 @@
-import prisma from "../database";
 import * as newsRepository from "../repositories/news-repository";
 import { CreateNewsData, UpdateNewsData } from "../repositories/news-repository";
 import { DEFAULT_ORDER } from "../config/constants";
@@ -40,38 +39,41 @@ export async function deleteNews(id: number) {
   return newsRepository.remove(id);
 }
 
-async function validateNewsData(data: CreateNewsData, checkTitle = true) {
-  if (checkTitle) await ensureUniqueTitle(data.title);
+async function validateNewsData(data: CreateNewsData, checkTitle = true, skipDupCheck = false) {
+  if (checkTitle && !skipDupCheck) await ensureUniqueTitle(data.title);
   ensureMinTextLength(data.text);
   ensureFuturePublicationDate(data.publicationDate);
 }
 
 async function ensureUniqueTitle(title: string) {
-  const exists = await prisma.news.findFirst({ where: { title } });
+  const exists = await newsRepository.findByTitle(title);
   if (exists) throwConflict(`News with title "${title}" already exists.`);
 }
 
 function ensureMinTextLength(text: string) {
-  if (text.length < MIN_TEXT_LENGTH) {
+  if (text.length < MIN_TEXT_LENGTH)
     throwBadRequest(`The news text must be at least ${MIN_TEXT_LENGTH} characters long.`);
-  }
 }
 
 function ensureFuturePublicationDate(date: string | Date) {
   const publicationDate = new Date(date);
-  if (publicationDate < new Date()) {
-    throwBadRequest("The publication date cannot be in the past.");
-  }
+  if (publicationDate < new Date()) throwBadRequest("The publication date cannot be in the past.");
 }
 
 function throwNotFound(id: number) {
-  throw { name: "NotFound", message: `News with id ${id} not found.` };
+  const error = new Error(`News with id ${id} not found.`);
+  error.name = "NotFound";
+  throw error;
 }
 
 function throwConflict(message: string) {
-  throw { name: "Conflict", message };
+  const error = new Error(message);
+  error.name = "Conflict";
+  throw error;
 }
 
 function throwBadRequest(message: string) {
-  throw { name: "BadRequest", message };
+  const error = new Error(message);
+  error.name = "BadRequest";
+  throw error;
 }

@@ -1,10 +1,10 @@
-import joi from "joi";
+import Joi from "joi";
 import { CreateNewsData } from "../repositories/news-repository";
 
-export const newsSchema = joi.object<CreateNewsData>({
-  title: joi.string().required(),
-  text: joi.string().min(500).required(),
-  author: joi.string().required(),
-  firstHand: joi.boolean().optional(),
-  publicationDate: joi.date().required(),
+export const newsSchema = Joi.object<CreateNewsData>({
+  title: Joi.string().trim().required(),
+  text: Joi.string().trim().required(),
+  author: Joi.string().trim().required(),
+  firstHand: Joi.boolean().optional(),
+  publicationDate: Joi.date().iso().required(),
 });

@@ -1,16 +1,7 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import httpStatus from "http-status";
 import * as NewsService from "../services/news-service";
 import { CreateNewsData, UpdateNewsData } from "../repositories/news-repository";
-
-export function idValidator(req: Request, res: Response, next: NextFunction) {
-  const id = Number(req.params.id);
-  if (id <= 0 || Math.floor(id) !== id) {
-    return res.status(httpStatus.BAD_REQUEST).send("Id is not valid.");
-  }
-  res.locals.id = id;
-  next();
-}
 
 export async function getNews(req: Request, res: Response) {
   const news = await NewsService.listNews(req.query);
